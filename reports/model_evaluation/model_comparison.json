@@ -1,0 +1,206 @@
+{
+  "generated_at": "2026-09-19T15:49:44.513193+00:00",
+  "CORRECTION_NOTE": "Earlier version of this file predicted same-timestamp congestion (nowcasting) while incorrectly labeling it a +60min forecast. This run uses a genuine T->T+1h target \u2014 see module docstring.",
+  "dataset": "Metro Interstate Traffic Volume (real, see docs/DATASETS.md)",
+  "target_definition": "target_congestion_1h: congestion label of traffic_volume at exactly T+1 hour from the feature row's timestamp T. Rows where the next available observation is not exactly 1 hour later (e.g. spanning the Aug2014-Jun2015 data gap) are excluded, not given a fabricated target.",
+  "feature_columns": [
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_holiday",
+    "is_rush_hour",
+    "lag_1h",
+    "lag_3h",
+    "lag_24h",
+    "rolling_3h_mean"
+  ],
+  "features_removed_due_to_leakage_risk": {
+    "temp": "would only be legitimate if sourced from a weather FORECAST for T+1h, not actual historical weather; no forecast source exists in this repo",
+    "rain_1h": "same reason as temp",
+    "snow_1h": "same reason as temp",
+    "clouds_all": "same reason as temp",
+    "weather_main": "same reason as temp"
+  },
+  "prediction_horizon": "+60 minutes (next hour) ONLY - hard constraint of this dataset's hourly resolution, not a design choice",
+  "congestion_label_thresholds": {
+    "q25": 1241.0,
+    "q50": 3391.0,
+    "q75": 4918.0
+  },
+  "label_methodology": "target_traffic_volume (T+1h) quartiles, computed on TRAIN split's target values only",
+  "rows_after_cleaning": null,
+  "train_rows": 23347,
+  "val_rows": 5003,
+  "test_rows": 5003,
+  "models": {
+    "logistic_regression": {
+      "training_time_sec": 0.44,
+      "validation": {
+        "split": "validation",
+        "n_samples": 5003,
+        "accuracy": 0.7619,
+        "precision_macro": 0.761,
+        "recall_macro": 0.7615,
+        "f1_macro": 0.7609,
+        "labels": [
+          "HIGH",
+          "LOW",
+          "MEDIUM",
+          "SEVERE"
+        ],
+        "confusion_matrix": [
+          [
+            855,
+            5,
+            109,
+            274
+          ],
+          [
+            14,
+            1040,
+            157,
+            8
+          ],
+          [
+            118,
+            206,
+            862,
+            32
+          ],
+          [
+            235,
+            26,
+            7,
+            1055
+          ]
+        ]
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 5003,
+        "accuracy": 0.8075,
+        "precision_macro": 0.8067,
+        "recall_macro": 0.8071,
+        "f1_macro": 0.8065,
+        "labels": [
+          "HIGH",
+          "LOW",
+          "MEDIUM",
+          "SEVERE"
+        ],
+        "confusion_matrix": [
+          [
+            955,
+            4,
+            92,
+            224
+          ],
+          [
+            16,
+            1051,
+            127,
+            6
+          ],
+          [
+            85,
+            192,
+            897,
+            10
+          ],
+          [
+            176,
+            28,
+            3,
+            1137
+          ]
+        ]
+      }
+    },
+    "random_forest": {
+      "training_time_sec": 0.87,
+      "validation": {
+        "split": "validation",
+        "n_samples": 5003,
+        "accuracy": 0.8995,
+        "precision_macro": 0.8992,
+        "recall_macro": 0.8999,
+        "f1_macro": 0.8995,
+        "labels": [
+          "HIGH",
+          "LOW",
+          "MEDIUM",
+          "SEVERE"
+        ],
+        "confusion_matrix": [
+          [
+            1027,
+            0,
+            102,
+            114
+          ],
+          [
+            0,
+            1189,
+            30,
+            0
+          ],
+          [
+            65,
+            50,
+            1100,
+            3
+          ],
+          [
+            139,
+            0,
+            0,
+            1184
+          ]
+        ]
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 5003,
+        "accuracy": 0.9135,
+        "precision_macro": 0.9137,
+        "recall_macro": 0.9144,
+        "f1_macro": 0.9138,
+        "labels": [
+          "HIGH",
+          "LOW",
+          "MEDIUM",
+          "SEVERE"
+        ],
+        "confusion_matrix": [
+          [
+            1062,
+            0,
+            84,
+            129
+          ],
+          [
+            0,
+            1163,
+            36,
+            1
+          ],
+          [
+            36,
+            46,
+            1102,
+            0
+          ],
+          [
+            100,
+            0,
+            1,
+            1243
+          ]
+        ]
+      }
+    }
+  },
+  "selected_model": "random_forest",
+  "selection_criterion": "highest test-set F1-macro"
+}

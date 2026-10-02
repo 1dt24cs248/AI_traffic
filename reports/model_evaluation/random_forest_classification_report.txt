@@ -1,0 +1,24 @@
+=== random_forest - VALIDATION (T->T+1h forecast) ===
+              precision    recall  f1-score   support
+
+        HIGH       0.83      0.83      0.83      1243
+         LOW       0.96      0.98      0.97      1219
+      MEDIUM       0.89      0.90      0.90      1218
+      SEVERE       0.91      0.89      0.90      1323
+
+    accuracy                           0.90      5003
+   macro avg       0.90      0.90      0.90      5003
+weighted avg       0.90      0.90      0.90      5003
+
+
+=== random_forest - TEST (T->T+1h forecast) ===
+              precision    recall  f1-score   support
+
+        HIGH       0.89      0.83      0.86      1275
+         LOW       0.96      0.97      0.97      1200
+      MEDIUM       0.90      0.93      0.92      1184
+      SEVERE       0.91      0.92      0.91      1344
+
+    accuracy                           0.91      5003
+   macro avg       0.91      0.91      0.91      5003
+weighted avg       0.91      0.91      0.91      5003

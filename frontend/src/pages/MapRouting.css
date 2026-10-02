@@ -1,0 +1,33 @@
+.map-routing-page {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 48px);
+}
+
+.map-routing-controls {
+  width: 360px;
+  min-width: 300px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.map-routing-map {
+  flex: 1;
+  min-height: 400px;
+  position: relative;
+}
+
+@media (max-width: 900px) {
+  .map-routing-page {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .map-routing-controls {
+    width: 100%;
+  }
+
+  .map-routing-map {
+    height: 400px;
+  }
+}

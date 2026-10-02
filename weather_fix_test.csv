@@ -1,0 +1,4 @@
+﻿road_id,latitude,longitude,timestamp,vehicle_count,average_speed,road_capacity,occupancy,weather,temperature,rainfall
+WEATHER-FIX-1,13.0098,77.5510,2026-09-20T10:00:00,70,35.0,150,0.47,CLEAR,27.5,0
+WEATHER-FIX-1,13.0098,77.5510,2026-09-20T10:05:00,80,31.0,150,0.53,CLOUDY,27.6,0
+WEATHER-FIX-2,13.0150,77.5600,2026-09-20T10:00:00,55,40.0,120,0.46,RAIN,26.8,1.2

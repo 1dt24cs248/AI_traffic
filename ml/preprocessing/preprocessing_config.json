@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-09-19T09:19:30.958856",
+  "raw_rows": 576,
+  "rows_after_cleaning": 576,
+  "rows_after_dropping_no_lag_history": 573,
+  "lag_window": 3,
+  "congestion_label_method": {
+    "basis": "average_speed / road's own 95th-percentile speed (free-flow proxy)",
+    "bin_edges": [
+      "-inf",
+      "0.25",
+      "0.5",
+      "0.75",
+      "inf"
+    ],
+    "labels_low_to_severe": [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "SEVERE"
+    ]
+  },
+  "temporal_features": [
+    "hour",
+    "minute",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_rush_hour"
+  ],
+  "lag_features": [
+    "previous_vehicle_count",
+    "previous_speed",
+    "previous_congestion_level"
+  ],
+  "rolling_features": [
+    "rolling_average_speed",
+    "rolling_average_vehicle_count"
+  ],
+  "split_method": "chronological (70/15/15), not random shuffle \u2014 see split.py docstring",
+  "split_summary": {
+    "train": {
+      "rows": 401,
+      "range": [
+        "2026-09-01 00:15:00",
+        "2026-09-02 09:30:00"
+      ]
+    },
+    "val": {
+      "rows": 86,
+      "range": [
+        "2026-09-02 09:30:00",
+        "2026-09-02 16:45:00"
+      ]
+    },
+    "test": {
+      "rows": 86,
+      "range": [
+        "2026-09-02 16:45:00",
+        "2026-09-02 23:45:00"
+      ]
+    }
+  }
+}

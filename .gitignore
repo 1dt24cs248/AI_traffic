@@ -1,0 +1,59 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python build
+build/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test / coverage
+.coverage
+htmlcov/
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Secrets / credentials
+*.pem
+*.key
+credentials.json
+*.tsbuildinfo
+# Large generated/cache files
+.cache/
+*.tsbuildinfo
+
+*.tsbuildinfo

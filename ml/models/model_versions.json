@@ -1,0 +1,27 @@
+[
+  {
+    "model_id": "random_forest-v1",
+    "algorithm": "RandomForestClassifier",
+    "version": "1.0",
+    "trained_at": "2026-09-19T15:21:18.790686+00:00",
+    "dataset": "Metro Interstate Traffic Volume (real, see docs/DATASETS.md)",
+    "dataset_version": "metro_interstate_traffic_volume.csv, sha256=749c90d720360a4215bb15345526073c079ba4cc95e3fa558796d083f85fce9e",
+    "features": [
+      "hour",
+      "day_of_week",
+      "month",
+      "is_weekend",
+      "is_holiday",
+      "is_rush_hour",
+      "lag_1h",
+      "lag_3h",
+      "lag_24h",
+      "rolling_3h_mean"
+    ],
+    "prediction_horizon": "+60 minutes (next hour) ONLY - hard constraint of this dataset's hourly resolution, not a design choice",
+    "test_accuracy": 0.9135,
+    "test_f1_macro": 0.9138,
+    "status": "active",
+    "model_file": "ml/models/random_forest.joblib (reproducible via `python -m ml.training.train_models`, not committed to the repo zip \u2014 see docs/CURRENT_STATUS.md)"
+  }
+]
