@@ -1,28 +1,29 @@
 """
 Tests for AI traffic-aware routing integration.
 
-These tests exercise the REAL traffic_feature_builder and traffic_scoring
-logic against constructed TrafficRecord-like objects. The prediction service
-(predict_speed/predict_congestion, which load real joblib model files) is
-mocked only where a test is specifically about prediction SUCCEEDING or
-FAILING at the integration boundary - the feature-building and scoring math
-itself is never mocked.
+These tests exercise feature construction and scoring helpers, and verify that
+incompatible simulated-road observations are not sent to the PEMS08 model.
 
 Run: python -m pytest tests/test_routing_traffic_prediction.py -v
 """
 import os
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost:5432/unused_in_these_tests")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-real")
 
 import pytest
+from fastapi import HTTPException
 
-from app.routing.traffic_feature_builder import build_features_for_road
+from app.routing.traffic_feature_builder import build_features_for_road, _is_rush_hour
 from app.routing.traffic_scoring import compute_route_score
-from app.api.routing_routes import _build_ai_traffic_assessment
+from app.traffic.simulation import _rush_hour_multiplier
+from app.api import routing_routes
+from app.api.routing_routes import _build_ai_traffic_assessment, calculate_routes
+from app.routing.schemas import RouteRequest
 
 
 def make_record(road_id: str, timestamp: datetime, vehicle_count: int, average_speed: float, occupancy):
@@ -117,6 +118,34 @@ def test_lag_records_never_cross_road_id():
     assert result.available is False  # SIM-NH48-01 has only T, no lag history of its own
 
 
+@pytest.mark.parametrize(
+    "hour,expected",
+    [(6, False), (7, True), (9, True), (10, False), (16, False),
+     (17, True), (19, True), (20, False)],
+)
+def test_weekday_rush_hour_boundaries(hour, expected):
+    timestamp = datetime(2026, 1, 5, hour)  # Monday
+    assert _is_rush_hour(timestamp) is expected
+
+
+@pytest.mark.parametrize("day", [5, 6])
+@pytest.mark.parametrize("hour", [7, 9, 17, 19])
+def test_weekends_are_not_calendar_rush_hour(day, hour):
+    timestamp = datetime(2026, 1, 5, hour) + timedelta(days=day)
+    assert timestamp.weekday() == day
+    assert _is_rush_hour(timestamp) is False
+
+
+@pytest.mark.parametrize(
+    "hour,expected",
+    [(6, 0.65), (7, 1.55), (9, 1.55), (10, 1.05), (15, 1.05),
+     (16, 1.65), (19, 1.65), (20, 0.90), (22, 0.90), (23, 0.65)],
+)
+def test_simulator_volume_profile_hour_boundaries(hour, expected):
+    # This is the all-day generation curve, distinct from the weekday feature flag.
+    assert _rush_hour_multiplier(hour) == expected
+
+
 # ---------------- traffic_scoring ----------------
 
 @pytest.mark.parametrize(
@@ -143,14 +172,10 @@ def test_unrecognized_congestion_level_raises():
 
 def test_no_coverage_means_no_prediction_call():
     coverage = {"traffic_coverage": False, "matched_roads": [], "match_radius_meters": 500}
-    with patch("app.api.routing_routes.predict_speed") as mock_speed, \
-         patch("app.api.routing_routes.predict_congestion") as mock_congestion:
-        assessment = _build_ai_traffic_assessment(coverage, traffic_records=[])
+    assessment = _build_ai_traffic_assessment(coverage, traffic_records=[])
 
     assert assessment.status == "unavailable_no_coverage"
     assert "unavailable" in assessment.reason.lower()
-    mock_speed.assert_not_called()
-    mock_congestion.assert_not_called()
 
 
 def test_coverage_but_insufficient_history_means_no_prediction_call():
@@ -160,55 +185,53 @@ def test_coverage_but_insufficient_history_means_no_prediction_call():
         "match_radius_meters": 500,
     }
     incomplete_records = build_complete_history()[:2]  # only T and T-5m
-    with patch("app.api.routing_routes.predict_speed") as mock_speed, \
-         patch("app.api.routing_routes.predict_congestion") as mock_congestion:
-        assessment = _build_ai_traffic_assessment(coverage, incomplete_records)
+    assessment = _build_ai_traffic_assessment(coverage, incomplete_records)
 
-    assert assessment.status == "unavailable_insufficient_history"
-    assert assessment.road_id == "SIM-NH48-01"
+    assert assessment.status == "unavailable_incompatible_input"
+    assert assessment.road_assessments[0].status == "unavailable_incompatible_input"
+
+
+def test_full_coverage_and_history_is_unavailable_for_incompatible_model_input():
+    coverage = {
+        "traffic_coverage": True,
+        "matched_roads": [{"road_id": "SIM-NH48-01", "distance_meters": 50.0}],
+        "match_radius_meters": 500,
+    }
+    records = build_complete_history()
+
+    with patch("app.api.routing_routes.predict_speed", create=True) as mock_speed, \
+         patch("app.api.routing_routes.predict_congestion", create=True) as mock_congestion:
+        assessment = _build_ai_traffic_assessment(coverage, records)
+
+    mock_speed.assert_not_called()
+    mock_congestion.assert_not_called()
+    assert assessment.status == "unavailable_incompatible_input"
+    assert assessment.data_source == "simulation"
+    assert assessment.predicted_speed is None
+    assert assessment.congestion_level is None
+    assert assessment.route_score is None
+    assert "not validated as PEMS08 flow" in assessment.reason
+    assert assessment.road_assessments[0].status == "unavailable_incompatible_input"
+
+
+def test_model_is_not_loaded_for_simulation_route_input():
+    coverage = {
+        "traffic_coverage": True,
+        "matched_roads": [{"road_id": "SIM-NH48-01", "distance_meters": 50.0}],
+        "match_radius_meters": 500,
+    }
+    records = build_complete_history()
+
+    with patch("app.api.routing_routes.predict_speed", create=True) as mock_speed, \
+         patch("app.api.routing_routes.predict_congestion", create=True) as mock_congestion:
+        assessment = _build_ai_traffic_assessment(coverage, records)
+
+    assert assessment.status == "unavailable_incompatible_input"
     mock_speed.assert_not_called()
     mock_congestion.assert_not_called()
 
 
-def test_full_coverage_and_history_produces_available_prediction():
-    coverage = {
-        "traffic_coverage": True,
-        "matched_roads": [{"road_id": "SIM-NH48-01", "distance_meters": 50.0}],
-        "match_radius_meters": 500,
-    }
-    records = build_complete_history()
-
-    with patch("app.api.routing_routes.predict_speed", return_value=42.5) as mock_speed, \
-         patch("app.api.routing_routes.predict_congestion", return_value={"congestion_level": "MEDIUM", "probabilities": {"LOW": 0.1, "MEDIUM": 0.6, "HIGH": 0.2, "SEVERE": 0.1}}) as mock_congestion:
-        assessment = _build_ai_traffic_assessment(coverage, records)
-
-    mock_speed.assert_called_once()
-    mock_congestion.assert_called_once()
-    assert assessment.status == "available"
-    assert assessment.data_source == "simulation"
-    assert assessment.predicted_speed == 42.5
-    assert assessment.congestion_level == "MEDIUM"
-    assert assessment.route_score == 70
-    assert "Simulation-based AI estimate" in assessment.reason
-    assert "not a validated real-world traffic forecast" in assessment.reason
-
-
-def test_prediction_service_failure_is_controlled_not_raised():
-    coverage = {
-        "traffic_coverage": True,
-        "matched_roads": [{"road_id": "SIM-NH48-01", "distance_meters": 50.0}],
-        "match_radius_meters": 500,
-    }
-    records = build_complete_history()
-
-    with patch("app.api.routing_routes.predict_speed", side_effect=FileNotFoundError("model missing")):
-        assessment = _build_ai_traffic_assessment(coverage, records)  # must not raise
-
-    assert assessment.status == "unavailable_prediction_error"
-    assert "model missing" in assessment.reason
-
-
-def test_closest_matched_road_is_used_when_multiple_exist():
+def test_all_matched_roads_are_reported_incompatible():
     coverage = {
         "traffic_coverage": True,
         "matched_roads": [
@@ -219,8 +242,138 @@ def test_closest_matched_road_is_used_when_multiple_exist():
     }
     records = build_complete_history(road_id="SIM-NH48-01")
 
-    with patch("app.api.routing_routes.predict_speed", return_value=30.0), \
-         patch("app.api.routing_routes.predict_congestion", return_value={"congestion_level": "LOW", "probabilities": {}}):
-        assessment = _build_ai_traffic_assessment(coverage, records)
+    assessment = _build_ai_traffic_assessment(coverage, records)
 
-    assert assessment.road_id == "SIM-NH48-01"  # the closer one, not SIM-NH48-02
+    assert assessment.status == "unavailable_incompatible_input"
+    assert [road.road_id for road in assessment.road_assessments] == [
+        "SIM-NH48-01", "SIM-NH48-02"
+    ]
+
+
+# ---------------- calculate_routes endpoint integration ----------------
+
+def _valid_route_request():
+    return RouteRequest(
+        origin_lat=13.0,
+        origin_lon=77.5,
+        destination_lat=13.1,
+        destination_lon=77.6,
+        alternatives=True,
+        traffic_match_radius_meters=500,
+    )
+
+
+def _osrm_result():
+    return {
+        "provider": "OSRM",
+        "routes": [
+            {
+                "distance": 2500.0,
+                "duration": 600.0,
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[77.55, 13.01], [77.56, 13.02]],
+                },
+            }
+        ],
+        "waypoints": [],
+    }
+
+
+def _database_with_records(records):
+    # A small explicit mock chain for SessionLocal -> query -> filter -> all.
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = records
+    return db
+
+
+@contextmanager
+def _patch_forbidden_predictions():
+    with ExitStack() as stack:
+        # These route-module call points do not exist in the current endpoint;
+        # create=True makes an accidental reintroduction fail the assertions.
+        mocks = [
+            stack.enter_context(patch("app.api.routing_routes.predict_speed", create=True)),
+            stack.enter_context(patch("app.api.routing_routes.predict_congestion", create=True)),
+            stack.enter_context(patch("app.api.routing_routes.compute_route_score", create=True)),
+            stack.enter_context(patch("app.routing.traffic_scoring.compute_route_score")),
+        ]
+        yield mocks
+
+
+def test_calculate_routes_returns_routes_coverage_and_incompatible_status():
+    base = datetime(2026, 1, 5, 8, 30)
+    records = build_complete_history(base=base)
+    for record in records:
+        record.latitude = 13.01
+        record.longitude = 77.55
+    db = _database_with_records(records)
+
+    with patch.object(routing_routes, "get_route", return_value=_osrm_result()), \
+         patch.object(routing_routes, "SessionLocal", return_value=db), \
+         _patch_forbidden_predictions() as prediction_mocks:
+        response = calculate_routes(_valid_route_request())
+    for prediction_mock in prediction_mocks:
+        prediction_mock.assert_not_called()
+
+    assert response.provider == "OSRM"
+    assert len(response.routes) == 1
+    assert response.routes[0].distance_meters == 2500.0
+    assert response.routes[0].duration_seconds == 600.0
+    assert response.traffic.traffic_coverage is True
+    assert response.traffic.matched_roads[0].road_id == "SIM-NH48-01"
+    assessment = response.routes[0].ai_traffic
+    assert assessment.status == "unavailable_incompatible_input"
+    assert assessment.predicted_speed is None
+    assert assessment.congestion_level is None
+    assert assessment.congestion_probabilities is None
+    assert assessment.route_score is None
+    assert assessment.road_assessments[0].status == "unavailable_incompatible_input"
+    assert assessment.road_assessments[0].predicted_speed is None
+    assert assessment.road_assessments[0].congestion_level is None
+    assert assessment.road_assessments[0].congestion_probabilities is None
+    assert assessment.road_assessments[0].route_score is None
+    db.close.assert_called_once()
+
+
+def test_calculate_routes_no_coverage_keeps_route_and_unavailable_status():
+    db = _database_with_records([])
+    with patch.object(routing_routes, "get_route", return_value=_osrm_result()), \
+         patch.object(routing_routes, "SessionLocal", return_value=db), \
+         _patch_forbidden_predictions() as prediction_mocks:
+        response = calculate_routes(_valid_route_request())
+    for prediction_mock in prediction_mocks:
+        prediction_mock.assert_not_called()
+
+    assert len(response.routes) == 1
+    assert response.traffic.traffic_coverage is False
+    assert response.traffic.matched_roads == []
+    assessment = response.routes[0].ai_traffic
+    assert assessment.status == "unavailable_no_coverage"
+    assert assessment.predicted_speed is None
+    assert assessment.congestion_level is None
+    assert assessment.congestion_probabilities is None
+    assert assessment.route_score is None
+    db.close.assert_called_once()
+
+
+def test_calculate_routes_maps_osrm_error_to_502():
+    with patch.object(routing_routes, "get_route", side_effect=routing_routes.OSRMError("provider unavailable")), \
+         patch.object(routing_routes, "SessionLocal") as session_factory:
+        with pytest.raises(HTTPException) as exc_info:
+            calculate_routes(_valid_route_request())
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "provider unavailable"
+    session_factory.assert_not_called()
+
+
+def test_calculate_routes_closes_database_session_after_coverage_failure():
+    db = _database_with_records([])
+    with patch.object(routing_routes, "get_route", return_value=_osrm_result()), \
+         patch.object(routing_routes, "SessionLocal", return_value=db), \
+         patch.object(routing_routes, "find_traffic_coverage", side_effect=RuntimeError("coverage failed")):
+        with pytest.raises(RuntimeError, match="coverage failed"):
+            calculate_routes(_valid_route_request())
+
+    db.close.assert_called_once()

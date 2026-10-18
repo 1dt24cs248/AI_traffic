@@ -2,22 +2,21 @@
 
 Spatio-temporal traffic congestion prediction and dynamic route recommendation system — BCA final-year project.
 
-## Status
+## Current status
 
-- **Module 1 — Auth**: done & tested
-- **Module 2 — Traffic Data Ingestion**: done & tested
-- **Module 3 — Preprocessing**: done & tested
-- **Module 4 — Analytics**: done & tested
-- **Module 5 — ML Training** & **Module 6 — Evaluation**: done & tested — real public
-  dataset (Metro Interstate Traffic Volume, UCI), genuine T→T+1h forecast (audited and
-  corrected — an earlier version was accidentally same-timestamp nowcasting; see
-  `docs/CURRENT_STATUS.md` for the full before/after). Random Forest: **91.4% test
-  accuracy / 0.914 test F1-macro**. 8 automated leakage/correctness tests, all passing.
-  See `docs/DATASETS.md` and `docs/CURRENT_STATUS.md` for full methodology.
-- Module 7 onward: not yet built
+This repository already includes a React/TypeScript MapLibre frontend, FastAPI
+backend, PostgreSQL models, OSRM routing, geocoding, traffic ingestion, analytics,
+simulation, and separate Metro ML work. Route prediction integration is currently
+disabled for simulated roads because the available PEMS08 model's sensor inputs
+and units have not been demonstrated compatible with the application schema. The
+route API returns an explicit unavailable reason instead of a synthetic-to-real
+prediction claim.
 
-See `docs/CURRENT_STATUS.md` for the full honest audit, including what is
-explicitly NOT started (explainability, alerts, routing, frontend, Docker verification, etc).
+See `docs/PROJECT_STATUS.md` for the inspected baseline, `docs/KNOWN_ISSUES.md`
+for limitations, `docs/ARCHITECTURE.md` for system boundaries, and
+`docs/IMPLEMENTATION_ROADMAP.md` for the remaining dependency order. The Metro
+and PEMS08 datasets and models are distinct pipelines; do not combine their
+features or metrics.
 
 ## Module 5 — Train the real model yourself
 
@@ -52,7 +51,7 @@ pip install -r requirements.txt --break-system-packages
 uvicorn app.main:app --reload
 ```
 
-## Endpoints implemented so far
+## Main endpoints
 
 ```
 GET  /api/health
@@ -65,7 +64,22 @@ POST /api/traffic/upload      (multipart CSV, requires login)
 GET  /api/traffic             (filter by road_id, start, end)
 GET  /api/traffic/{road_id}
 GET  /api/traffic/summary
+GET  /api/geocoding/search
+POST /api/routing/routes
+GET  /api/analytics/*
+POST /api/predictions/pems08/speed
+POST /api/predictions/pems08/congestion
 ```
+
+Route calculations require authentication. OSRM distance and duration are base
+routing estimates; they are not live traffic-adjusted travel times. The current
+route traffic assessment reports why the PEMS08 model cannot safely evaluate
+application simulation observations.
+
+The standalone PEMS08 prediction endpoints are separate from route assessment.
+Their model files are outside this Git repository, and `backend/requirements.txt`
+does not currently include their `joblib`/pandas runtime dependencies; they are
+not verified for a clean installation.
 
 ## Sample data
 
@@ -96,14 +110,14 @@ random (see docstrings in `ml/preprocessing/split.py` and `features.py`).
 
 `ml/data/synthetic_test_dataset.csv` (576 rows, 2 days, 3 roads) is **synthetic data
 generated to exercise the pipeline** — not a real dataset and not used for real
-model-accuracy claims. Module 5 will use an actual public traffic dataset per the
-spec's dataset-selection requirement.
+model-accuracy claims. The separate Metro training pipeline uses the public hourly
+dataset documented in `docs/DATASETS.md`; neither dataset is interchangeable with
+the application simulator data.
 
-## Next phases (not yet built — see project spec)
+## Remaining work
 
-4. Traffic analytics: peak hours, congestion frequency, heatmaps
-5. ML congestion classifier: baseline (Logistic Regression) vs Random Forest/XGBoost, with real evaluation metrics
-6. Explainability layer (feature importance / SHAP)
-7. Alerts, routing engine, route recommendation, map UI, admin dashboard, PDF reports
-
-Each phase will be added the same way: real code, real file paths, tested before moving on.
+Analytics, routing, geocoding, and the map UI already exist. Route recommendation,
+traffic overlays, alerts, explainability, admin tools, and PDF reporting remain
+incomplete. See `docs/IMPLEMENTATION_ROADMAP.md`; the route endpoint reports
+incompatible simulation inputs as unavailable and does not run PEMS08 inference
+for those records.

@@ -48,13 +48,12 @@ DOCUMENTED FIELD/UNIT SUBSTITUTIONS (per approved implementation plan)
 Calendar features
 ===========================================================================
 hour / day_of_week / month / is_weekend / is_rush_hour are derived from the
-observation's own real `timestamp` - never invented. The rush-hour window
-used here (07-09, 16-19) matches app/traffic/simulation.py's own
-_rush_hour_multiplier definition, for internal consistency with how this
-simulated data was generated. Note this is NOT the same window used in
-ml/preprocessing/real_dataset_features.py or pems08_features.py (both use
-17-19 for the evening peak) - a pre-existing inconsistency across this
-project's modules, not introduced or resolved here.
+observation's own timestamp. is_rush_hour follows the explicit application ML
+feature convention in ml/preprocessing/features.py: weekday hours 07-09 and
+17-19, inclusive by hour; weekends are false. The simulator's separate volume
+multiplier is a generation curve, not this categorical feature: it applies
+hours 07-09 and 16-19 on every day. These definitions intentionally serve
+different purposes and must not be conflated.
 """
 from __future__ import annotations
 
@@ -93,10 +92,11 @@ def _occupancy_ratio(record: TrafficRecord) -> Optional[float]:
 
 
 def _is_rush_hour(timestamp: datetime) -> bool:
+    """Whether timestamp falls in the documented weekday calendar window."""
     is_weekend = timestamp.weekday() >= 5  # Monday=0 .. Sunday=6
     if is_weekend:
         return False
-    return (7 <= timestamp.hour <= 9) or (16 <= timestamp.hour <= 19)
+    return (7 <= timestamp.hour <= 9) or (17 <= timestamp.hour <= 19)
 
 
 def build_features_for_road(

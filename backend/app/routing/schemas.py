@@ -31,30 +31,29 @@ class RouteTrafficRoadAssessment(BaseModel):
 
 class RouteTrafficAssessment(BaseModel):
     """
-    Route-level AI traffic assessment built from all matched
-    application traffic roads associated with the route.
+    Route-level traffic availability and prediction status.
 
-    The route-level result is an aggregation of the individual
-    road-level predictions. It does not invent traffic data.
+    Matched simulation records currently produce an unavailable status because
+    there is no validated model/input contract for those records.
     """
 
     status: str
     data_source: Optional[str] = None
 
-    # Backward-compatible primary/representative road.
+    # Optional fields retained for response compatibility.
     road_id: Optional[str] = None
     observation_timestamp: Optional[datetime] = None
 
-    # Aggregated route-level prediction.
+    # Prediction fields remain null when no compatible model is available.
     predicted_speed: Optional[float] = None
     congestion_level: Optional[str] = None
     congestion_probabilities: Optional[dict[str, float]] = None
     route_score: Optional[int] = None
 
-    # Number of roads actually evaluated for this route.
+    # Number of roads actually evaluated by a compatible model.
     roads_assessed: int = 0
 
-    # Individual road-level assessments used to build the route result.
+    # Per-road availability assessments.
     road_assessments: list[RouteTrafficRoadAssessment] = Field(default_factory=list)
 
     reason: str

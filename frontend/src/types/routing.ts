@@ -33,6 +33,7 @@ export type RouteTrafficStatus =
   | 'available'
   | 'unavailable_no_coverage'
   | 'unavailable_insufficient_history'
+  | 'unavailable_incompatible_input'
   | 'unavailable_prediction_error'
 
 export type CongestionLevel =
@@ -78,8 +79,13 @@ export interface RouteSummary {
 
 export interface TrafficCoverage {
   traffic_coverage: boolean
-  matched_roads: unknown[]
+  matched_roads: MatchedTrafficRoad[]
   match_radius_meters: number
+}
+
+export interface MatchedTrafficRoad {
+  road_id: string
+  distance_meters: number
 }
 
 export interface RouteResponse {
