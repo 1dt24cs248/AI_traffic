@@ -1,8 +1,12 @@
 import api from './api'
 import type { RouteRequest, RouteResponse } from '../types/routing'
 
-export async function getRoutes(request: RouteRequest): Promise<RouteResponse> {
-  const response = await api.post<RouteResponse>('/api/routing/routes', request)
+export async function getRoutes(
+  request: RouteRequest,
+  refresh = false,
+): Promise<RouteResponse> {
+  const endpoint = refresh ? '/api/routing/routes/refresh' : '/api/routing/routes'
+  const response = await api.post<RouteResponse>(endpoint, request)
   return response.data
 }
 

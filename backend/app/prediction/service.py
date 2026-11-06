@@ -7,6 +7,7 @@ used during training.
 """
 
 from pathlib import Path
+import os
 from typing import Any
 
 import joblib
@@ -17,16 +18,26 @@ import pandas as pd
 # Paths
 # ---------------------------------------------------------------------------
 
-# backend/app/prediction/service.py
-# parents[0] = prediction
-# parents[1] = app
-# parents[2] = backend
-# parents[3] = traffic-flow-predictor
-# parents[4] = outer project root
+def _resolve_pems08_model_dir(service_file: Path, configured_dir: str | None = None) -> Path:
+    """Resolve artifacts in the source workspace or an explicitly mounted location.
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+    The development checkout keeps PEMS08 artifacts in the workspace parent.
+    The backend container is shallower, so its Compose configuration supplies
+    PEMS08_MODEL_DIR for the read-only artifact mount.
+    """
+    if configured_dir:
+        return Path(configured_dir).expanduser().resolve()
 
-PEMS08_MODEL_DIR = PROJECT_ROOT / "ml" / "models" / "pems08"
+    parents = service_file.resolve().parents
+    backend_root = next((parent for parent in parents if parent.name == "backend"), None)
+    project_root = backend_root.parent.parent if backend_root else parents[-1]
+    return project_root / "ml" / "models" / "pems08"
+
+
+PEMS08_MODEL_DIR = _resolve_pems08_model_dir(
+    Path(__file__),
+    os.environ.get("PEMS08_MODEL_DIR"),
+)
 
 
 SPEED_MODEL_PATH = PEMS08_MODEL_DIR / "pems08_speed_random_forest.joblib"

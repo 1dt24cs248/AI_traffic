@@ -1,33 +1,76 @@
 .map-routing-page {
   display: flex;
-  gap: 20px;
-  height: calc(100vh - 48px);
+  align-items: stretch;
+  gap: 18px;
+  min-height: min(760px, calc(100vh - 112px));
 }
 
 .map-routing-controls {
-  width: 360px;
-  min-width: 300px;
+  width: min(390px, 38%);
+  min-width: 280px;
+  min-height: 0;
+  flex: 0 0 auto;
+  max-height: calc(100vh - 112px);
   overflow-y: auto;
-  padding-right: 8px;
+  padding: 2px 12px 16px 2px;
+  overscroll-behavior: contain;
 }
 
 .map-routing-map {
   flex: 1;
-  min-height: 400px;
+  min-width: 0;
+  min-height: 620px;
+  max-height: calc(100vh - 112px);
+  overflow: hidden;
+  border: 1px solid #dfe5ef;
+  border-radius: 12px;
+  background: #e8edf4;
+  box-shadow: 0 2px 8px rgb(23 32 51 / 5%);
   position: relative;
 }
+
+.route-card {
+  margin: 10px 0;
+  padding: 16px;
+  border: 1px solid #dfe5ef;
+  border-radius: 10px;
+  background: #fff;
+  overflow-wrap: anywhere;
+  box-shadow: 0 2px 8px rgb(23 32 51 / 4%);
+}
+.route-card.is-selected { border: 2px solid #4f46e5; background: #f7f7ff; }
+.route-card.is-blocked { border-color: #fecaca; background: #fffafa; }
+.route-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.route-card-title { color: #24324a; font-size: 16px; font-weight: 750; }
+.route-card-metrics { display: flex; gap: 16px; text-align: right; }
+.route-card-metrics span { display: grid; gap: 2px; }
+.route-card-metrics strong { color: #172033; font-size: 18px; white-space: nowrap; }
+.route-card-metrics small, .route-card-method { color: #64748b; font-size: 12px; }
+.route-card-method { margin: 5px 0 10px; }
+.route-stale-banner { padding: 10px 12px; border: 1px solid #f3cf85; border-radius: 7px; background: #fffbeb; color: #713f12; font-size: 13px; font-weight: 650; }
 
 @media (max-width: 900px) {
   .map-routing-page {
     flex-direction: column;
-    height: auto;
+    min-height: 0;
   }
 
   .map-routing-controls {
     width: 100%;
+    min-width: 0;
   }
 
   .map-routing-map {
-    height: 400px;
+    height: clamp(340px, 55vh, 520px);
+    min-height: 340px;
+    max-height: none;
   }
+  .map-routing-controls { max-height: none; overflow: visible; }
+}
+
+@media (max-width: 520px) {
+  .map-routing-map { min-width: 0; border-radius: 10px; }
+  .route-card-heading { flex-direction: column; }
+  .route-card-metrics { width: 100%; justify-content: flex-start; text-align: left; }
+  .map-routing-page { gap: 12px; }
 }

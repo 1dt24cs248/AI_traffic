@@ -11,6 +11,7 @@ import requests
 
 
 NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 DEFAULT_USER_AGENT = (
     "AI-Traffic-Flow-Predictor/1.0 "
@@ -222,3 +223,41 @@ def search_places(
     _cache.set(cache_key, results)
 
     return results
+
+
+def reverse_geocode(
+    latitude: float,
+    longitude: float,
+    *,
+    user_agent: str | None = None,
+) -> str | None:
+    """Return a display address for coordinates, or None if no address exists."""
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise ValueError("Coordinates are outside the valid range.")
+
+    _wait_for_rate_limit()
+    try:
+        response = requests.get(
+            NOMINATIM_REVERSE_URL,
+            params={"lat": latitude, "lon": longitude, "format": "jsonv2"},
+            headers={
+                "User-Agent": user_agent or DEFAULT_USER_AGENT,
+                "Accept": "application/json",
+            },
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+    except requests.Timeout as exc:
+        raise NominatimTimeoutError("Address lookup timed out. Please try again.") from exc
+    except requests.RequestException as exc:
+        raise NominatimUpstreamError("Could not connect to the address-lookup service.") from exc
+
+    if response.status_code != 200:
+        raise NominatimUpstreamError(f"Nominatim returned HTTP {response.status_code}.")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise NominatimUpstreamError("Nominatim returned invalid JSON.") from exc
+    if not isinstance(payload, dict):
+        raise NominatimUpstreamError("Nominatim returned an unexpected response.")
+    display_name = payload.get("display_name")
+    return display_name if isinstance(display_name, str) and display_name.strip() else None

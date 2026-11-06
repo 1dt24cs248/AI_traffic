@@ -8,9 +8,10 @@ Optional source filtering is supported so dashboards can
 separate simulation data from uploaded/live data.
 """
 
+from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -19,23 +20,56 @@ from app.models.user import User
 from app.services import analytics
 
 
+def _validate_date_range(start_date: date | None, end_date: date | None) -> None:
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=422,
+            detail="start_date must be on or before end_date.",
+        )
+
+
 router = APIRouter(
     prefix="/api/analytics",
     tags=["analytics"],
 )
 
 
+@router.get("/sources")
+def get_traffic_sources(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return analytics.available_sources(db)
+
+
+@router.get("/summary")
+def get_traffic_summary(
+    source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _validate_date_range(start_date, end_date)
+    return analytics.traffic_summary(db, source, start_date, end_date)
+
+
 @router.get("/volume-by-hour")
 def get_volume_by_hour(
     road_id: Optional[str] = None,
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.volume_by_hour(
         db,
         road_id,
         source,
+        start_date,
+        end_date,
     )
 
 
@@ -43,37 +77,52 @@ def get_volume_by_hour(
 def get_speed_by_hour(
     road_id: Optional[str] = None,
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.speed_by_hour(
         db,
         road_id,
         source,
+        start_date,
+        end_date,
     )
 
 
 @router.get("/weekday-vs-weekend")
 def get_weekday_vs_weekend(
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.weekday_vs_weekend(
         db,
         source,
+        start_date,
+        end_date,
     )
 
 
 @router.get("/road-statistics")
 def get_road_statistics(
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.road_statistics(
         db,
         source,
+        start_date,
+        end_date,
     )
 
 
@@ -85,23 +134,33 @@ def get_peak_hours(
         le=24,
     ),
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.peak_hours(
         db,
         top_n,
         source,
+        start_date,
+        end_date,
     )
 
 
 @router.get("/congestion-heatmap")
 def get_congestion_heatmap(
     source: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _validate_date_range(start_date, end_date)
     return analytics.congestion_heatmap(
         db,
         source,
+        start_date,
+        end_date,
     )

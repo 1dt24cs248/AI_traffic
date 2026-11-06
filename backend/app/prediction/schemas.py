@@ -2,32 +2,38 @@
 Pydantic schemas for PEMS08 prediction APIs.
 """
 
-from typing import Dict
+from typing import Annotated, Dict
 
 from pydantic import BaseModel, Field
+
+
+PEMS08Measurement = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 
 class PEMS08Features(BaseModel):
     """Exact 20-feature input contract used by the trained PEMS08 models."""
 
-    flow: float = Field(..., description="Current sensor flow")
-    occupancy: float = Field(..., description="Current sensor occupancy")
-    speed: float = Field(..., description="Current sensor speed in km/h")
+    flow: PEMS08Measurement = Field(..., description="Current PEMS08 flow in raw dataset units")
+    occupancy: PEMS08Measurement = Field(..., description="Current PEMS08 occupancy in raw dataset units")
+    speed: PEMS08Measurement = Field(
+        ...,
+        description="Current PEMS08 speed in raw dataset units; physical unit not independently verified",
+    )
 
-    flow_lag_5m: float
-    flow_lag_15m: float
-    flow_lag_30m: float
-    flow_lag_1h: float
+    flow_lag_5m: PEMS08Measurement
+    flow_lag_15m: PEMS08Measurement
+    flow_lag_30m: PEMS08Measurement
+    flow_lag_1h: PEMS08Measurement
 
-    speed_lag_5m: float
-    speed_lag_15m: float
-    speed_lag_30m: float
-    speed_lag_1h: float
+    speed_lag_5m: PEMS08Measurement
+    speed_lag_15m: PEMS08Measurement
+    speed_lag_30m: PEMS08Measurement
+    speed_lag_1h: PEMS08Measurement
 
-    occupancy_lag_5m: float
-    occupancy_lag_15m: float
-    occupancy_lag_30m: float
-    occupancy_lag_1h: float
+    occupancy_lag_5m: PEMS08Measurement
+    occupancy_lag_15m: PEMS08Measurement
+    occupancy_lag_30m: PEMS08Measurement
+    occupancy_lag_1h: PEMS08Measurement
 
     hour: int = Field(..., ge=0, le=23)
     day_of_week: int = Field(..., ge=0, le=6)
@@ -39,7 +45,8 @@ class PEMS08Features(BaseModel):
 class PEMS08SpeedPrediction(BaseModel):
     model: str
     prediction_horizon: str
-    predicted_speed_kmh: float
+    predicted_speed: float
+    speed_unit_note: str
 
 
 class PEMS08CongestionPrediction(BaseModel):
@@ -47,3 +54,4 @@ class PEMS08CongestionPrediction(BaseModel):
     prediction_horizon: str
     congestion_level: str
     probabilities: Dict[str, float]
+    probability_note: str

@@ -5,9 +5,10 @@ from app.geocoding.nominatim_client import (
     NominatimBusyError,
     NominatimTimeoutError,
     NominatimUpstreamError,
+    reverse_geocode,
     search_places,
 )
-from app.geocoding.schemas import GeocodingResult, GeocodingSearchResponse
+from app.geocoding.schemas import GeocodingResult, GeocodingReverseResponse, GeocodingSearchResponse
 
 
 router = APIRouter(
@@ -81,3 +82,23 @@ def geocode_search(
         query=query,
         results=results,
     )
+
+
+@router.get("/reverse", response_model=GeocodingReverseResponse)
+def geocode_reverse(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    current_user=Depends(get_current_user),
+) -> GeocodingReverseResponse:
+    del current_user
+    try:
+        display_name = reverse_geocode(latitude, longitude)
+    except NominatimBusyError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except NominatimTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except NominatimUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GeocodingReverseResponse(display_name=display_name)

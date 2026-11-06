@@ -17,3 +17,8 @@ class GeocodingSearchResponse(BaseModel):
     attribution: str = (
         "Search results © OpenStreetMap contributors, provided via Nominatim"
     )
+
+
+class GeocodingReverseResponse(BaseModel):
+    display_name: str | None
+    attribution: str = "Address lookup © OpenStreetMap contributors, provided via Nominatim"

@@ -16,6 +16,13 @@ export async function searchPlaces(
   return response.data
 }
 
+export async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+  const response = await api.get<{ display_name: string | null }>('/api/geocoding/reverse', {
+    params: { latitude, longitude },
+  })
+  return response.data.display_name
+}
+
 export function extractGeocodingError(err: unknown): string {
   const error = err as any
 

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GeolocationStatus } from '../types/routing'
 
 interface UseGeolocationResult {
@@ -11,6 +11,7 @@ interface UseGeolocationResult {
   isWatching: boolean
   status: GeolocationStatus
   startWatching: () => void
+  getCurrentLocation: () => Promise<{ latitude: number; longitude: number } | null>
   stopWatching: () => void
 }
 
@@ -24,6 +25,7 @@ export function useGeolocation(): UseGeolocationResult {
   const watchIdRef = useRef<number | null>(null)
 
   const startWatching = useCallback(() => {
+    if (watchIdRef.current !== null) return
     if (!('geolocation' in navigator)) {
       setStatus('unsupported')
       setError('This browser does not support geolocation.')
@@ -42,6 +44,10 @@ export function useGeolocation(): UseGeolocationResult {
         setTimestamp(pos.timestamp)
       },
       (err) => {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current)
+          watchIdRef.current = null
+        }
         if (err.code === err.PERMISSION_DENIED) {
           setStatus('denied')
           setError('Location permission was denied.')
@@ -57,12 +63,54 @@ export function useGeolocation(): UseGeolocationResult {
     )
   }, [])
 
+  const getCurrentLocation = useCallback(() => new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+    if (!('geolocation' in navigator)) {
+      setStatus('unsupported')
+      setError('This browser does not support geolocation.')
+      resolve(null)
+      return
+    }
+    setStatus('requesting')
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setStatus('active')
+        setLatitude(pos.coords.latitude)
+        setLongitude(pos.coords.longitude)
+        setAccuracy(pos.coords.accuracy ?? null)
+        setTimestamp(pos.timestamp)
+        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setStatus('denied')
+          setError('Location permission was denied. You can search for a place instead.')
+        } else if (err.code === err.TIMEOUT) {
+          setStatus('unavailable')
+          setError('Location request timed out. Try again or search for a place.')
+        } else {
+          setStatus('unavailable')
+          setError('Location is currently unavailable. Search for a place instead.')
+        }
+        resolve(null)
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+    )
+  }), [])
+
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
     }
     setStatus('idle')
+  }, [])
+
+  useEffect(() => () => {
+    if (watchIdRef.current !== null && 'geolocation' in navigator) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
   }, [])
 
   return {
@@ -75,6 +123,7 @@ export function useGeolocation(): UseGeolocationResult {
     isWatching: watchIdRef.current !== null,
     status,
     startWatching,
+    getCurrentLocation,
     stopWatching,
   }
 }

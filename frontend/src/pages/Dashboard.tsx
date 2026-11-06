@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   BarChart,
   Bar,
@@ -19,6 +19,8 @@ import {
   getRoadStatistics,
   getPeakHours,
   getCongestionHeatmap,
+  getTrafficSources,
+  getTrafficSummary,
   extractErrorMessage,
 } from '../services/analytics'
 import type {
@@ -28,6 +30,8 @@ import type {
   RoadStatistic,
   PeakHourItem,
   CongestionHeatmapCell,
+  AnalyticsFilters,
+  TrafficSummary,
 } from '../types/analytics'
 
 interface AsyncState<T> {
@@ -42,62 +46,106 @@ function initialState<T>(): AsyncState<T> {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] // day_of_week 0=Monday, matches backend
 
-function mean(values: number[]): number | null {
-  if (values.length === 0) return null
-  return values.reduce((sum, v) => sum + v, 0) / values.length
-}
-
 function Dashboard() {
+  const [sources, setSources] = useState<string[]>([])
+  const [sourcesLoading, setSourcesLoading] = useState(true)
+  const [sourcesError, setSourcesError] = useState<string | null>(null)
+  const [source, setSource] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [summary, setSummary] = useState<AsyncState<TrafficSummary>>(initialState)
   const [volume, setVolume] = useState<AsyncState<VolumeByHourItem[]>>(initialState)
   const [speed, setSpeed] = useState<AsyncState<SpeedByHourItem[]>>(initialState)
   const [weekdayWeekend, setWeekdayWeekend] = useState<AsyncState<WeekdayVsWeekend>>(initialState)
   const [roadStats, setRoadStats] = useState<AsyncState<RoadStatistic[]>>(initialState)
   const [peakHours, setPeakHours] = useState<AsyncState<PeakHourItem[]>>(initialState)
   const [heatmap, setHeatmap] = useState<AsyncState<CongestionHeatmapCell[]>>(initialState)
+  const requestId = useRef(0)
+
+  useEffect(() => {
+    let active = true
+    getTrafficSources()
+      .then((data) => {
+        if (!active) return
+        setSources(data)
+        setSourcesError(null)
+        setSource((current) => current || (data.includes('simulation') ? 'simulation' : data[0] ?? ''))
+      })
+      .catch((err) => {
+        if (active) setSourcesError(extractErrorMessage(err))
+      })
+      .finally(() => {
+        if (active) setSourcesLoading(false)
+      })
+    return () => { active = false }
+  }, [])
 
   const fetchAll = useCallback(() => {
-    // Each section fetches and fails independently (Promise, not Promise.all) so
-    // one failing endpoint never blocks the others from loading/displaying.
+    const currentRequest = ++requestId.current
+    if (sourcesLoading) return
+    const filters: AnalyticsFilters = {
+      ...(source ? { source } : {}),
+      ...(startDate ? { start_date: startDate } : {}),
+      ...(endDate ? { end_date: endDate } : {}),
+    }
+    if (startDate && endDate && startDate > endDate) {
+      const error = 'Start date must be on or before end date.'
+      setSummary({ data: null, loading: false, error })
+      setVolume({ data: null, loading: false, error })
+      setSpeed({ data: null, loading: false, error })
+      setWeekdayWeekend({ data: null, loading: false, error })
+      setRoadStats({ data: null, loading: false, error })
+      setPeakHours({ data: null, loading: false, error })
+      setHeatmap({ data: null, loading: false, error })
+      return
+    }
+
+    const isCurrentRequest = () => requestId.current === currentRequest
+    setSummary(initialState())
+    getTrafficSummary(filters)
+      .then((data) => { if (isCurrentRequest()) setSummary({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setSummary({ data: null, loading: false, error: extractErrorMessage(err) }) })
+
     setVolume(initialState())
-    getVolumeByHour()
-      .then((data) => setVolume({ data, loading: false, error: null }))
-      .catch((err) => setVolume({ data: null, loading: false, error: extractErrorMessage(err) }))
+    getVolumeByHour(filters)
+      .then((data) => { if (isCurrentRequest()) setVolume({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setVolume({ data: null, loading: false, error: extractErrorMessage(err) }) })
 
     setSpeed(initialState())
-    getSpeedByHour()
-      .then((data) => setSpeed({ data, loading: false, error: null }))
-      .catch((err) => setSpeed({ data: null, loading: false, error: extractErrorMessage(err) }))
+    getSpeedByHour(filters)
+      .then((data) => { if (isCurrentRequest()) setSpeed({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setSpeed({ data: null, loading: false, error: extractErrorMessage(err) }) })
 
     setWeekdayWeekend(initialState())
-    getWeekdayVsWeekend()
-      .then((data) => setWeekdayWeekend({ data, loading: false, error: null }))
-      .catch((err) => setWeekdayWeekend({ data: null, loading: false, error: extractErrorMessage(err) }))
+    getWeekdayVsWeekend(filters)
+      .then((data) => { if (isCurrentRequest()) setWeekdayWeekend({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setWeekdayWeekend({ data: null, loading: false, error: extractErrorMessage(err) }) })
 
     setRoadStats(initialState())
-    getRoadStatistics()
-      .then((data) => setRoadStats({ data, loading: false, error: null }))
-      .catch((err) => setRoadStats({ data: null, loading: false, error: extractErrorMessage(err) }))
+    getRoadStatistics(filters)
+      .then((data) => { if (isCurrentRequest()) setRoadStats({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setRoadStats({ data: null, loading: false, error: extractErrorMessage(err) }) })
 
     setPeakHours(initialState())
-    getPeakHours()
-      .then((data) => setPeakHours({ data, loading: false, error: null }))
-      .catch((err) => setPeakHours({ data: null, loading: false, error: extractErrorMessage(err) }))
+    getPeakHours(filters)
+      .then((data) => { if (isCurrentRequest()) setPeakHours({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setPeakHours({ data: null, loading: false, error: extractErrorMessage(err) }) })
 
     setHeatmap(initialState())
-    getCongestionHeatmap()
-      .then((data) => setHeatmap({ data, loading: false, error: null }))
-      .catch((err) => setHeatmap({ data: null, loading: false, error: extractErrorMessage(err) }))
-  }, [])
+    getCongestionHeatmap(filters)
+      .then((data) => { if (isCurrentRequest()) setHeatmap({ data, loading: false, error: null }) })
+      .catch((err) => { if (isCurrentRequest()) setHeatmap({ data: null, loading: false, error: extractErrorMessage(err) }) })
+  }, [source, startDate, endDate, sourcesLoading])
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
   // Summary card values - all computed from real fetched arrays, nothing invented.
-  const avgSpeedOverall = speed.data ? mean(speed.data.map((d) => d.avg_speed)) : null
-  const avgVehicleCountOverall = volume.data ? mean(volume.data.map((d) => d.avg_vehicle_count)) : null
+  const avgSpeedOverall = summary.data?.avg_speed ?? null
+  const avgVehicleCountOverall = summary.data?.avg_vehicle_count ?? null
   const topPeakHour = peakHours.data && peakHours.data.length > 0 ? peakHours.data[0] : null
-  const roadsMonitored = roadStats.data ? roadStats.data.length : null
+  const roadsMonitored = summary.data?.road_count ?? null
 
   // Weekday vs weekend chart data - only includes sides that actually have data,
   // never plots a fabricated 0 for a null side.
@@ -130,18 +178,62 @@ function Dashboard() {
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+    <div className="traffic-dashboard">
+      <div className="dashboard-heading">
         <div>
           <h1 style={{ margin: 0 }}>Traffic Dashboard</h1>
           <p style={{ color: '#666', marginTop: 4 }}>
-            Traffic analytics computed from the simulation dataset stored in PostgreSQL.
+            Stored traffic observations from the selected source and date range. This is not a live feed.
           </p>
         </div>
-        <button onClick={fetchAll} style={{ padding: '8px 16px', cursor: 'pointer' }}>
+        <button
+          onClick={fetchAll}
+          disabled={!!(startDate && endDate && startDate > endDate)}
+          style={{ padding: '8px 16px', cursor: 'pointer' }}
+        >
           Refresh
         </button>
       </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, margin: '16px 0' }}>
+        <label>
+          Data source
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            style={{ display: 'block', minWidth: 180, padding: 8, marginTop: 4 }}
+          >
+            <option value="">All sources (combined)</option>
+            {sources.map((availableSource) => (
+              <option key={availableSource} value={availableSource}>{availableSource}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          From
+          <input
+            type="date"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(event) => setStartDate(event.target.value)}
+            style={{ display: 'block', padding: 7, marginTop: 4 }}
+          />
+        </label>
+        <label>
+          Through
+          <input
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(event) => setEndDate(event.target.value)}
+            style={{ display: 'block', padding: 7, marginTop: 4 }}
+          />
+        </label>
+      </div>
+      {sourcesError && <p role="alert">Could not load available data sources: {sourcesError}</p>}
+      {startDate && endDate && startDate > endDate && (
+        <p role="alert">Start date must be on or before end date.</p>
+      )}
 
       <div
         style={{
@@ -155,8 +247,34 @@ function Dashboard() {
           marginBottom: 20,
         }}
       >
-        Data source: Simulation
+        Data source: {source || 'All sources combined'}
       </div>
+      {!source && !sourcesLoading && (
+        <p role="note" style={{ color: '#854d0e', background: '#fef3c7', padding: 10, borderRadius: 6 }}>
+          This view combines every available source, which may include synthetic simulation records.
+          Select one source to keep its metrics separate.
+        </p>
+      )}
+      <p style={{ color: '#526078', fontSize: 13 }}>
+        Selected observation period: {startDate || 'all dates'} through {endDate || 'present'}.
+        {source ? ` Source: ${source}.` : ' Source: all available sources combined.'}
+      </p>
+      {summary.data && (
+        <p style={{ color: '#666', fontSize: 13, marginTop: -12 }}>
+          {summary.data.sample_count.toLocaleString()} observations across {summary.data.road_count} roads
+          {' · '}observed range: {summary.data.first_observation
+            ? new Date(summary.data.first_observation).toLocaleString()
+            : '—'} to{' '}
+          {summary.data.last_observation
+            ? new Date(summary.data.last_observation).toLocaleString()
+            : '—'}
+          {' · '}latest stored observation (freshness indicator):{' '}
+          {summary.data.last_observation
+            ? new Date(summary.data.last_observation).toLocaleString()
+            : 'unavailable'}
+        </p>
+      )}
+      {!summary.loading && summary.error && <p role="alert">Summary unavailable: {summary.error}</p>}
 
       {/* Summary cards */}
       <div
@@ -250,30 +368,32 @@ function Dashboard() {
         error={roadStats.error}
         isEmpty={!!roadStats.data && roadStats.data.length === 0}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
-              <th style={{ padding: 8 }}>Road ID</th>
-              <th style={{ padding: 8 }}>Road Name</th>
-              <th style={{ padding: 8 }}>Avg Speed</th>
-              <th style={{ padding: 8 }}>Min Speed</th>
-              <th style={{ padding: 8 }}>Avg Vehicle Count</th>
-              <th style={{ padding: 8 }}>Sample Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(roadStats.data ?? []).map((road) => (
-              <tr key={road.road_id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={{ padding: 8 }}>{road.road_id}</td>
-                <td style={{ padding: 8 }}>{road.road_name ?? '—'}</td>
-                <td style={{ padding: 8 }}>{road.avg_speed.toFixed(1)}</td>
-                <td style={{ padding: 8 }}>{road.min_speed.toFixed(1)}</td>
-                <td style={{ padding: 8 }}>{road.avg_vehicle_count.toFixed(1)}</td>
-                <td style={{ padding: 8 }}>{road.sample_count}</td>
+        <div className="app-table-scroll" role="region" aria-label="Road statistics table" tabIndex={0}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
+                <th style={{ padding: 8 }}>Road ID</th>
+                <th style={{ padding: 8 }}>Road Name</th>
+                <th style={{ padding: 8 }}>Avg Speed</th>
+                <th style={{ padding: 8 }}>Min Speed</th>
+                <th style={{ padding: 8 }}>Avg Vehicle Count</th>
+                <th style={{ padding: 8 }}>Sample Count</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(roadStats.data ?? []).map((road) => (
+                <tr key={road.road_id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: 8 }}>{road.road_id}</td>
+                  <td style={{ padding: 8 }}>{road.road_name ?? '—'}</td>
+                  <td style={{ padding: 8 }}>{road.avg_speed.toFixed(1)}</td>
+                  <td style={{ padding: 8 }}>{road.min_speed.toFixed(1)}</td>
+                  <td style={{ padding: 8 }}>{road.avg_vehicle_count.toFixed(1)}</td>
+                  <td style={{ padding: 8 }}>{road.sample_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </SectionCard>
 
       {/* Peak hours */}
@@ -346,17 +466,9 @@ function Dashboard() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        border: '1px solid #e0e0e0',
-        borderRadius: 8,
-        padding: 16,
-        backgroundColor: '#fff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      }}
-    >
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e' }}>{value}</div>
+    <div className="dashboard-metric-card">
+      <div>{label}</div>
+      <strong>{value}</strong>
     </div>
   )
 }

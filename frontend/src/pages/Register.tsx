@@ -1,9 +1,11 @@
 import { FormEvent, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { register } from '../services/auth'
+import { getRegistrationLoginState } from '../services/authNavigation.mjs'
 
 function Register() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +18,7 @@ function Register() {
     setLoading(true)
     try {
       await register({ email, full_name: fullName, password })
-      navigate('/login', { replace: true })
+      navigate('/login', { replace: true, state: getRegistrationLoginState(location.state) })
     } catch (err) {
       setError('Registration failed. The email may already be registered, or the password may be too short.')
     } finally {
@@ -25,10 +27,13 @@ function Register() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: '80px auto', padding: '24px', border: '1px solid #ddd' }}>
-      <h1>Register</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '12px' }}>
+    <div className="auth-shell">
+      <section className="auth-card">
+        <p className="auth-brand">AI Traffic Flow Predictor</p>
+        <h1>Create your account</h1>
+        <p className="auth-description">Get started with route planning and traffic insights.</p>
+        <form className="auth-form" onSubmit={handleSubmit}>
+        <div>
           <label htmlFor="fullName">Full name</label>
           <br />
           <input
@@ -37,22 +42,21 @@ function Register() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
-            style={{ width: '100%' }}
           />
         </div>
-        <div style={{ marginBottom: '12px' }}>
+        <div>
           <label htmlFor="email">Email</label>
           <br />
           <input
             id="email"
             type="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: '100%' }}
           />
         </div>
-        <div style={{ marginBottom: '12px' }}>
+        <div>
           <label htmlFor="password">Password</label>
           <br />
           <input
@@ -62,17 +66,18 @@ function Register() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            style={{ width: '100%' }}
+            autoComplete="new-password"
           />
         </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
+        {error && <p role="alert" className="auth-error">{error}</p>}
+        <button className="auth-submit" type="submit" disabled={loading}>
           {loading ? 'Registering...' : 'Register'}
         </button>
       </form>
-      <p>
-        Already have an account? <Link to="/login">Login</Link>
+      <p className="auth-footer">
+        Already have an account? <Link to="/login" state={getRegistrationLoginState(location.state)}>Login</Link>
       </p>
+      </section>
     </div>
   )
 }

@@ -1,9 +1,24 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
-import { logout } from '../services/auth'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { getCurrentUser, logout } from '../services/auth'
 
-const UPCOMING_SECTIONS = ['Predictions', 'Alerts', 'Reports']
 function AppLayout() {
   const navigate = useNavigate()
+  const [adminAccess, setAdminAccess] = useState<'checking' | 'allowed' | 'denied' | 'unknown'>('checking')
+
+  useEffect(() => {
+    let active = true
+    getCurrentUser()
+      .then((user) => {
+        if (active) setAdminAccess(user.role === 'ADMIN' ? 'allowed' : 'denied')
+      })
+      .catch(() => {
+        if (active) setAdminAccess('unknown')
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   function handleLogout() {
     logout()
@@ -11,38 +26,26 @@ function AppLayout() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <nav
-        style={{
-          width: 220,
-          borderRight: '1px solid #ddd',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ fontWeight: 'bold', marginBottom: '16px' }}>AI Traffic Flow Predictor</div>
-
-        <Link to="/home">Home</Link>
-        <Link to="/dashboard">Dashboard</Link>
-
-        <div style={{ marginTop: '16px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>
-          Coming soon
-        </div>
-       <Link to="/map">Map & Routing</Link>
-
-{UPCOMING_SECTIONS.map((section) => (
-  <span key={section} style={{ color: '#aaa' }}>
-    {section}
-  </span>
-))}
-        <button onClick={handleLogout} style={{ marginTop: 'auto' }}>
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <Link className="app-brand" to="/" aria-label="AI Traffic Flow Predictor public home">AI Traffic Flow Predictor</Link>
+        <nav className="app-nav" aria-label="Main navigation">
+          <NavLink to="/home" className="nav-group-label">Overview</NavLink>
+          <NavLink to="/dashboard">Dashboard</NavLink>
+          <div className="nav-group-label">Journey</div>
+          <NavLink to="/predictions">SmartCommute AI</NavLink>
+          <NavLink to="/map">Map &amp; Routing</NavLink>
+          <div className="nav-group-label">Insights</div>
+          <NavLink to="/simulations">Fuel &amp; Energy Estimator</NavLink>
+          <NavLink to="/reports">Reports</NavLink>
+          <NavLink to="/alerts">Alerts</NavLink>
+          {adminAccess === 'allowed' && <NavLink to="/admin/incidents">Incident moderation</NavLink>}
+        </nav>
+        <button className="app-logout" onClick={handleLogout}>
           Logout
         </button>
-      </nav>
-
-      <main style={{ flex: 1, padding: '24px' }}>
+      </aside>
+      <main className="app-main">
         <Outlet />
       </main>
     </div>

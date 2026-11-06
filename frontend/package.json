@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "node src/services/routeTrafficLoader.test.mjs && node src/services/fuelImpact.test.mjs && node src/services/authNavigation.test.mjs && node src/services/authRouting.integration.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

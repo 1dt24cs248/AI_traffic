@@ -66,7 +66,23 @@ GET  /api/traffic/{road_id}
 GET  /api/traffic/summary
 GET  /api/geocoding/search
 POST /api/routing/routes
+POST /api/routing/routes/refresh
+POST /api/simulations
+GET  /api/simulations
+GET  /api/simulations/{run_id}
+POST /api/simulations/fuel-impact (authenticated, non-persisting estimate)
+GET  /api/incidents
+GET  /api/incidents/mine      (only the signed-in user's reports)
+POST /api/incidents
+GET  /api/incidents/{incident_id}
+PATCH /api/incidents/{incident_id}
+POST /api/incidents/{incident_id}/verify   (admin)
+POST /api/incidents/{incident_id}/reject   (admin)
+POST /api/incidents/{incident_id}/resolve
+GET  /api/alerts              (verified incident alerts; status/severity/date filters)
 GET  /api/analytics/*
+GET  /api/reports             (filtered traffic, incident and simulation summaries)
+GET  /api/predictions/pems08/status
 POST /api/predictions/pems08/speed
 POST /api/predictions/pems08/congestion
 ```
@@ -76,10 +92,64 @@ routing estimates; they are not live traffic-adjusted travel times. The current
 route traffic assessment reports why the PEMS08 model cannot safely evaluate
 application simulation observations.
 
+Incident reports are authenticated and begin pending (`reported`). Users may
+track only their own pending, verified, rejected, and resolved reports. Pending
+and rejected report details are private to the submitter and moderators; public
+route warnings and Reports detail lists contain verified/resolved reports.
+Administrators can verify or reject pending reports and manage any incident.
+Only verified, unresolved incidents appear in active Alerts. The route API only associates an incident with geometry
+within 15 m when no road reference is supplied; when a reference is supplied,
+it must match an OSRM route-step name/reference and fall within 100 m at most.
+Only verified, non-simulated full-road closures exclude a route; unverified
+closures and partial obstructions remain warnings. Route plans are refreshed
+only on demand; no background monitoring is active.
+
+The Dashboard and Reports pages filter traffic analytics by source and inclusive
+date range. The Dashboard's summary statistics and charts query the same selected
+traffic records; leaving source blank includes all stored sources. Alerts are
+derived only from verified incidents and show the incident's persisted active or
+resolved state. They are not real-time notifications and do not have a separate
+acknowledgement state. Reports use actual traffic, incident, and simulation-run
+records; prediction history is not persisted.
+
+Apply additive schema migrations from `backend/` with
+`alembic -c alembic.ini upgrade head`. Existing tables and incident records are
+preserved; migrations create missing Phase 1 tables and add missing incident
+columns without resetting data. Downgrades intentionally refuse destructive
+deletion.
+
+The **Simulations** page is the Stop-and-Go Fuel & Energy Impact Estimator. It reuses a selected SmartCommute route and its already retrieved traffic/weather data, or accepts a user-entered distance; it never starts a duplicate route search. Its formulas, units, heuristic assumptions, missing-data behavior, and limits are documented in [FUEL_ENERGY_ESTIMATOR.md](docs/FUEL_ENERGY_ESTIMATOR.md). The authenticated estimate API does not persist observations. Historical synthetic simulation APIs and their records remain available.
+
+Authenticated users can create and inspect reproducible baseline simulations
+through the existing API. Generated traffic observations and run metadata
+are persisted atomically; conflicting road/timestamp values return `409` without
+changing existing records. Simulation output is synthetic, is labelled with
+`source="simulation"`, and is not a live observation or validated prediction.
+The existing PEMS08 route compatibility gate remains in effect.
+
+The **Predictions** page calls the standalone PEMS08 endpoints using the model's
+20-feature input contract and a manually supplied sensor ID, timestamp, and
+same-sensor history. It does not use application traffic records. The speed
+response identifies its value as PEMS08 dataset units because the physical
+speed unit is not independently verified; prediction history is not saved.
+Missing model artifacts are reported as unavailable rather than replaced with
+fabricated predictions.
+
+## Initial administrator bootstrap
+
+From `backend/`, run `python -m app.cli.bootstrap_admin` in an interactive
+terminal after the database is configured and its `users` table exists. The
+CLI prompts with hidden password input, requires matching password entries and
+explicit `CREATE ADMIN` confirmation, and refuses if any administrator already
+exists. It uses the application's bcrypt password hashing; there is no public
+administrator registration endpoint. Do not pass credentials as command-line
+arguments or run this bootstrap against production without an approved operator.
+
 The standalone PEMS08 prediction endpoints are separate from route assessment.
-Their model files are outside this Git repository, and `backend/requirements.txt`
-does not currently include their `joblib`/pandas runtime dependencies; they are
-not verified for a clean installation.
+Their training source, data and model artifacts are outside this Git repository,
+although their runtime dependencies are listed in `backend/requirements.txt`.
+A clean clone therefore has no PEMS08 artifacts; the status endpoint reports
+artifact availability, and API tests do not load or execute those model files.
 
 ## Sample data
 
@@ -116,8 +186,10 @@ the application simulator data.
 
 ## Remaining work
 
-Analytics, routing, geocoding, and the map UI already exist. Route recommendation,
-traffic overlays, alerts, explainability, admin tools, and PDF reporting remain
-incomplete. See `docs/IMPLEMENTATION_ROADMAP.md`; the route endpoint reports
-incompatible simulation inputs as unavailable and does not run PEMS08 inference
-for those records.
+Analytics, geocoding, and the map UI already exist. Hazard-aware route
+recommendation now excludes applicable verified closures and can be refreshed
+explicitly; it does not provide continuous monitoring. Traffic overlays,
+weather integration, simulation studio workflows, explainability, admin tools,
+and PDF reporting remain incomplete. See `docs/IMPLEMENTATION_ROADMAP.md`.
+The route endpoint still reports incompatible simulation inputs as unavailable
+and does not run PEMS08 inference for those records.

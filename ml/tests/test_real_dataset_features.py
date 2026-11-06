@@ -13,6 +13,7 @@ from ml.preprocessing.real_dataset_features import (
     run, FEATURE_COLUMNS, TARGET_COLUMN,
     load_raw, clean, add_temporal_features, add_lag_and_rolling_features, add_forecast_target,
 )
+from ml.training.train_models import select_best_model
 
 
 @pytest.fixture(scope="module")
@@ -142,3 +143,18 @@ def test_target_column_present_and_no_nulls(pipeline_output):
     assert TARGET_COLUMN in df.columns
     assert df[TARGET_COLUMN].isna().sum() == 0
     assert set(df[TARGET_COLUMN].unique()) <= {"LOW", "MEDIUM", "HIGH", "SEVERE"}
+
+
+def test_model_selection_uses_validation_not_test_metrics():
+    results = {
+        "logistic_regression": {
+            "validation": {"f1_macro": 0.82},
+            "test": {"f1_macro": 0.70},
+        },
+        "random_forest": {
+            "validation": {"f1_macro": 0.79},
+            "test": {"f1_macro": 0.95},
+        },
+    }
+
+    assert select_best_model(results) == "logistic_regression"

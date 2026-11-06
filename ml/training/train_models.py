@@ -68,6 +68,13 @@ def evaluate(pipeline: Pipeline, df: pd.DataFrame, split_name: str) -> dict:
     }
 
 
+def select_best_model(results: dict) -> str:
+    """Select using validation data so the test set remains held out for reporting."""
+    if not results:
+        raise ValueError("Cannot select a model from an empty result set.")
+    return max(results, key=lambda name: results[name]["validation"]["f1_macro"])
+
+
 def run():
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(EVAL_DIR, exist_ok=True)
@@ -118,8 +125,8 @@ def run():
             "model_path": model_path,
         }
 
-    best_model_name = max(results, key=lambda k: results[k]["test"]["f1_macro"])
-    print(f"\nSelected model: {best_model_name} (highest test F1-macro)")
+    best_model_name = select_best_model(results)
+    print(f"\nSelected model: {best_model_name} (highest validation F1-macro)")
 
     comparison = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -156,7 +163,7 @@ def run():
             for name, r in results.items()
         },
         "selected_model": best_model_name,
-        "selection_criterion": "highest test-set F1-macro",
+        "selection_criterion": "highest validation-set F1-macro; test set reserved for final reporting",
     }
 
     with open(os.path.join(EVAL_DIR, "model_comparison.json"), "w") as f:

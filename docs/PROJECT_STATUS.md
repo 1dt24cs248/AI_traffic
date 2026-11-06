@@ -2,6 +2,48 @@
 
 Audit date: 2026-10-18 (Asia/Calcutta)
 
+## Implementation update — 2026-10-19
+
+The following implementation was added after the audit below; this section
+supersedes conflicting feature-status entries in the original audit:
+
+- Simulation API and UI are connected. Generated observations remain labelled
+  synthetic, and no simulation-to-PEMS08 inference was added.
+- Dashboard source and inclusive date filters now apply to each analytics query.
+  Weighted summary values, charts, and road statistics use the same selected
+  observation set.
+- Incident moderation has reported/verified/resolved filters and admin verify
+  and resolve actions. Existing role checks remain in the API.
+- The Predictions page calls the existing PEMS08 endpoints with the explicit
+  20-feature sensor input contract. It does not consume application-road data.
+  Speed output is described in PEMS08 dataset units because a physical unit has
+  not been independently established.
+- Alerts are a filtered view of verified incidents and their persisted active
+  or resolved status; they are not real-time notifications and do not have a
+  separate acknowledgement state.
+- Reports query traffic, incident, and simulation-run data. Prediction history
+  is not persisted and is reported as unavailable.
+- Validation for this implementation: backend suite **169 passed, 3 warnings**;
+  frontend TypeScript check passed; production Vite build passed with a large
+  chunk warning. No live database, browser, external-provider, or model
+  inference test was run.
+
+### TomTom observation storage — 2026-10-20
+
+- Successful responses from authenticated `/api/traffic/current-flow` and
+  uncached successful route-flow samples now attempt insert-only persistence
+  through an independent, short-lived SQLAlchemy session. Storage failure is
+  rolled back/logged without changing the live response contract.
+- Scheduled collection is **not active**. Captures occur only as a side effect
+  of successful live endpoint requests.
+- The current provider integration has no validated stable segment reference.
+  Captured observations remain provisional and **are not forecast-eligible**;
+  request coordinates are not used to manufacture segment identities.
+- TomTom storage/retention and model-training permissions remain **unverified**.
+  No training or forecast use of these observations is enabled.
+- No migration was executed as part of this implementation. Verification used
+  mocked persistence sessions and focused API/provider tests, not a live DB.
+
 ## Repository baseline
 
 - Git root: this directory (`traffic-flow-predictor/`), branch `main`, commit `0c61455c7db8885562abc1db0fa90fb7c6e3c0c8`.

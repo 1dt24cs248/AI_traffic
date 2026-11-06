@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -17,11 +18,63 @@ from app.core.database import get_db
 from app.models.traffic_record import TrafficRecord
 from app.models.user import User
 from app.schemas.traffic import TrafficRecordOut, IngestionSummary
+from app.schemas.tomtom import CurrentTrafficFlow, RouteTrafficResult
+from app.traffic.route_flow import DEFAULT_SAMPLED_POINTS, MAX_SAMPLED_POINTS, get_route_flow
 from app.traffic.ingestion import ingest_rows, parse_csv_bytes
+from app.traffic.observation_store import persist_tomtom_observation_best_effort
+from app.traffic.tomtom import (
+    TomTomRateLimitError,
+    TomTomUnavailableError,
+    TomTomUpstreamError,
+    get_current_flow,
+)
 
 router = APIRouter(prefix="/api/traffic", tags=["traffic"])
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB — Section 22: maximum upload size
+
+
+@router.get("/current-flow", response_model=CurrentTrafficFlow)
+def current_flow(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    current_user: User = Depends(get_current_user),
+):
+    del current_user
+    try:
+        flow = get_current_flow(latitude, longitude)
+    except TomTomUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TomTomRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except TomTomUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    persist_tomtom_observation_best_effort(flow)
+    return flow
+
+
+
+
+class RouteFlowRequest(BaseModel):
+    coordinates: list[list[float]]
+    sample_count: int = DEFAULT_SAMPLED_POINTS
+
+
+@router.post("/route-flow", response_model=RouteTrafficResult)
+def route_flow(request: RouteFlowRequest, current_user: User = Depends(get_current_user)):
+    del current_user
+    if not 2 <= request.sample_count <= MAX_SAMPLED_POINTS:
+        raise HTTPException(status_code=422, detail=f"sample_count must be between 2 and {MAX_SAMPLED_POINTS}.")
+    try:
+        return get_route_flow(request.coordinates, request.sample_count)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TomTomUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TomTomRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except TomTomUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/upload", response_model=IngestionSummary, status_code=status.HTTP_201_CREATED)

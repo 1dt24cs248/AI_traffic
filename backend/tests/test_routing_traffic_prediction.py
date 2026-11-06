@@ -8,7 +8,7 @@ Run: python -m pytest tests/test_routing_traffic_prediction.py -v
 """
 import os
 from contextlib import ExitStack, contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -357,6 +357,27 @@ def test_calculate_routes_no_coverage_keeps_route_and_unavailable_status():
     db.close.assert_called_once()
 
 
+def test_calculate_routes_anchors_weather_to_requested_departure():
+    departure = datetime.now(timezone.utc) + timedelta(days=2)
+    request = _valid_route_request().model_copy(
+        update={"departure_datetime": departure}
+    )
+    db = _database_with_records([])
+    with patch.object(routing_routes, "get_route", return_value=_osrm_result()), \
+         patch.object(routing_routes, "SessionLocal", return_value=db), \
+         patch.object(routing_routes, "get_forecasts", return_value={}) as forecasts, \
+         patch.object(
+             routing_routes,
+             "assess_route_weather",
+             return_value={"status": "unavailable", "reason": "test forecast"},
+         ) as assess_weather:
+        calculate_routes(request)
+
+    assert forecasts.call_args.kwargs["forecast_days"] == 4
+    assert assess_weather.call_args.kwargs["now"] == departure
+    db.close.assert_called_once()
+
+
 def test_calculate_routes_maps_osrm_error_to_502():
     with patch.object(routing_routes, "get_route", side_effect=routing_routes.OSRMError("provider unavailable")), \
          patch.object(routing_routes, "SessionLocal") as session_factory:
@@ -376,4 +397,28 @@ def test_calculate_routes_closes_database_session_after_coverage_failure():
         with pytest.raises(RuntimeError, match="coverage failed"):
             calculate_routes(_valid_route_request())
 
+    db.close.assert_called_once()
+
+
+def test_calculate_routes_preserves_every_osrm_alternative():
+    osrm_result = _osrm_result()
+    osrm_result["routes"].append({
+        "distance": 3100.0,
+        "duration": 720.0,
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [[77.55, 13.01], [77.57, 13.03]],
+        },
+    })
+    db = _database_with_records([])
+
+    with patch.object(routing_routes, "get_route", return_value=osrm_result) as get_route, \
+         patch.object(routing_routes, "SessionLocal", return_value=db), \
+         patch.object(routing_routes, "get_forecasts", return_value={}), \
+         _patch_forbidden_predictions():
+        response = calculate_routes(_valid_route_request())
+
+    assert get_route.call_args.kwargs["alternatives"] is True
+    assert len(response.routes) == 2
+    assert [route.distance_meters for route in response.routes] == [2500.0, 3100.0]
     db.close.assert_called_once()

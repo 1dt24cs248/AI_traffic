@@ -41,3 +41,18 @@ export interface CongestionHeatmapCell {
   avg_speed: number
   sample_count: number
 }
+
+export interface AnalyticsFilters {
+  source?: string
+  start_date?: string
+  end_date?: string
+}
+
+export interface TrafficSummary {
+  avg_speed: number | null
+  avg_vehicle_count: number | null
+  sample_count: number
+  road_count: number
+  first_observation: string | null
+  last_observation: string | null
+}

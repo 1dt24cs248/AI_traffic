@@ -1,5 +1,10 @@
 import api, { TOKEN_STORAGE_KEY } from './api'
-import type { LoginResponse, RegisterRequest, RegisterResponse } from '../types/auth'
+import type {
+  CurrentUser,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+} from '../types/auth'
 
 // Uses POST /api/auth/token (OAuth2 password flow, form-encoded username/password) —
 // per your current backend's Swagger authentication flow, not /api/auth/login.
@@ -18,6 +23,11 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
   const response = await api.post<RegisterResponse>('/api/auth/register', data)
+  return response.data
+}
+
+export async function getCurrentUser(): Promise<CurrentUser> {
+  const response = await api.get<CurrentUser>('/api/auth/me')
   return response.data
 }
 

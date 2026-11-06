@@ -202,5 +202,5 @@
     }
   },
   "selected_model": "random_forest",
-  "selection_criterion": "highest test-set F1-macro"
+  "selection_criterion": "highest validation-set F1-macro; test set reserved for final reporting"
 }

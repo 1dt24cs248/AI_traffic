@@ -11,16 +11,115 @@ Analytics can optionally be filtered by data source, for example:
 If source is omitted, all available sources are included.
 """
 
+from datetime import date, datetime, time, timedelta
+
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from app.models.traffic_record import TrafficRecord
 
 
+def _apply_filters(
+    query,
+    source: str | None,
+    start_date: date | None,
+    end_date: date | None,
+):
+    if source:
+        query = query.filter(TrafficRecord.source == source)
+    if start_date:
+        query = query.filter(
+            TrafficRecord.timestamp >= datetime.combine(start_date, time.min)
+        )
+    if end_date:
+        query = query.filter(
+            TrafficRecord.timestamp
+            < datetime.combine(end_date + timedelta(days=1), time.min)
+        )
+    return query
+
+
+def available_sources(db: Session) -> list[str]:
+    return [
+        row[0]
+        for row in db.query(TrafficRecord.source)
+        .distinct()
+        .order_by(TrafficRecord.source)
+        .all()
+    ]
+
+
+def traffic_summary(
+    db: Session,
+    source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> dict:
+    query = _apply_filters(
+        db.query(
+            func.avg(TrafficRecord.average_speed).label("avg_speed"),
+            func.avg(TrafficRecord.vehicle_count).label("avg_vehicle_count"),
+            func.count(TrafficRecord.id).label("sample_count"),
+            func.count(func.distinct(TrafficRecord.road_id)).label("road_count"),
+            func.min(TrafficRecord.timestamp).label("first_observation"),
+            func.max(TrafficRecord.timestamp).label("last_observation"),
+        ),
+        source,
+        start_date,
+        end_date,
+    )
+    row = query.one()
+    return {
+        "avg_speed": round(row.avg_speed, 1) if row.avg_speed is not None else None,
+        "avg_vehicle_count": (
+            round(row.avg_vehicle_count, 1)
+            if row.avg_vehicle_count is not None
+            else None
+        ),
+        "sample_count": row.sample_count,
+        "road_count": row.road_count,
+        "first_observation": row.first_observation,
+        "last_observation": row.last_observation,
+    }
+
+
+def daily_trend(
+    db: Session,
+    source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[dict]:
+    query = _apply_filters(
+        db.query(
+            func.date(TrafficRecord.timestamp).label("date"),
+            func.avg(TrafficRecord.average_speed).label("avg_speed"),
+            func.avg(TrafficRecord.vehicle_count).label("avg_vehicle_count"),
+            func.count(TrafficRecord.id).label("sample_count"),
+        ),
+        source,
+        start_date,
+        end_date,
+    )
+    rows = query.group_by(func.date(TrafficRecord.timestamp)).order_by(
+        func.date(TrafficRecord.timestamp)
+    ).all()
+    return [
+        {
+            "date": str(row.date),
+            "avg_speed": round(row.avg_speed, 1),
+            "avg_vehicle_count": round(row.avg_vehicle_count, 1),
+            "sample_count": row.sample_count,
+        }
+        for row in rows
+    ]
+
+
 def volume_by_hour(
     db: Session,
     road_id: str | None = None,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[dict]:
     """Average vehicle_count grouped by hour-of-day."""
 
@@ -33,8 +132,7 @@ def volume_by_hour(
     if road_id:
         query = query.filter(TrafficRecord.road_id == road_id)
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = (
         query
@@ -57,6 +155,8 @@ def speed_by_hour(
     db: Session,
     road_id: str | None = None,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[dict]:
     """Average speed grouped by hour-of-day."""
 
@@ -69,8 +169,7 @@ def speed_by_hour(
     if road_id:
         query = query.filter(TrafficRecord.road_id == road_id)
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = (
         query
@@ -92,6 +191,8 @@ def speed_by_hour(
 def weekday_vs_weekend(
     db: Session,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> dict:
     """Compare weekday and weekend traffic."""
 
@@ -107,8 +208,7 @@ def weekday_vs_weekend(
         func.count(TrafficRecord.id).label("sample_count"),
     )
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = query.group_by(is_weekend).all()
 
@@ -132,6 +232,8 @@ def weekday_vs_weekend(
 def road_statistics(
     db: Session,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[dict]:
     """Per-road traffic summary."""
 
@@ -144,8 +246,7 @@ def road_statistics(
         func.count(TrafficRecord.id).label("sample_count"),
     )
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = (
         query
@@ -174,6 +275,8 @@ def peak_hours(
     db: Session,
     top_n: int = 3,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[dict]:
     """Return hours with the lowest average speed."""
 
@@ -182,8 +285,7 @@ def peak_hours(
         func.avg(TrafficRecord.average_speed).label("avg_speed"),
     )
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = (
         query
@@ -205,6 +307,8 @@ def peak_hours(
 def congestion_heatmap(
     db: Session,
     source: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[dict]:
     """Return day_of_week × hour average-speed data."""
 
@@ -215,8 +319,7 @@ def congestion_heatmap(
         func.count(TrafficRecord.id).label("sample_count"),
     )
 
-    if source:
-        query = query.filter(TrafficRecord.source == source)
+    query = _apply_filters(query, source, start_date, end_date)
 
     rows = (
         query

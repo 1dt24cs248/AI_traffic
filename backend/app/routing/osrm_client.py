@@ -13,8 +13,10 @@ from typing import Any
 
 import requests
 
+from app.core.config import settings
 
-OSRM_BASE_URL = "https://router.project-osrm.org"
+
+OSRM_BASE_URL = settings.OSRM_BASE_URL
 
 
 class OSRMError(Exception):
@@ -27,26 +29,25 @@ def get_route(
     destination_lat: float,
     destination_lon: float,
     alternatives: bool = True,
+    profile: str = "driving",
 ) -> dict[str, Any]:
     """
-    Request a driving route from OSRM.
+    Request a route from OSRM.
 
     Parameters
     ----------
-    origin_lat:
-        Origin latitude.
+    origin_lat, origin_lon:
+        Origin coordinates.
 
-    origin_lon:
-        Origin longitude.
-
-    destination_lat:
-        Destination latitude.
-
-    destination_lon:
-        Destination longitude.
+    destination_lat, destination_lon:
+        Destination coordinates.
 
     alternatives:
         Ask OSRM to return alternative routes when available.
+
+    profile:
+        OSRM routing profile. The public OSRM service supports
+        'driving', 'cycling', and 'foot'. Defaults to 'driving'.
 
     Returns
     -------
@@ -59,7 +60,7 @@ def get_route(
         f"{destination_lon},{destination_lat}"
     )
 
-    url = f"{OSRM_BASE_URL}/route/v1/driving/{coordinates}"
+    url = f"{OSRM_BASE_URL}/route/v1/{profile}/{coordinates}"
 
     params = {
         "overview": "full",
