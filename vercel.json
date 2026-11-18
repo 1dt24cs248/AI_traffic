@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "backend/app/main.py",
@@ -15,15 +16,19 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/app/main.py"
+      "dest": "/backend/app/main.py"
     },
     {
       "src": "/assets/(.*)",
-      "dest": "frontend/dist/assets/$1"
+      "dest": "/frontend/assets/$1"
+    },
+    {
+      "src": "/(.*\\.(?:js|css|svg|png|jpg|jpeg|gif|ico|json|woff2?))",
+      "dest": "/frontend/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/index.html"
+      "dest": "/frontend/index.html"
     }
   ]
 }
