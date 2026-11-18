@@ -1,0 +1,375 @@
+{
+  "generated_at": "2026-09-21T07:59:27.048575+00:00",
+  "dataset": "PEMS08 (real, see docs/DATASETS.md)",
+  "prediction_horizon": "+60 minutes (12 five-minute steps) - same sensor, exact T+1h target",
+  "compute_note": "RandomForest configs (n_estimators=20, max_depth=8, min_samples_leaf=500) reduced from a more typical setup due to a MEASURED single-core sandbox constraint and a 300s-per-command execution limit discovered during this run. Trained on the FULL training set (not a subsample) - only ensemble size/depth were reduced.",
+  "data": {
+    "raw_timestamps": 17856,
+    "raw_sensors": 170,
+    "raw_sensor_time_rows": 3035520,
+    "dropped_incomplete_lag_history": 2040,
+    "dropped_no_valid_target": 2040,
+    "trainable_rows": 3031440,
+    "train_rows": 2121940,
+    "val_rows": 454750,
+    "test_rows": 454750
+  },
+  "known_label_imbalance": {
+    "note": "target_congestion_1h is severely imbalanced - thresholds NOT changed to mask this",
+    "train_distribution_pct": {
+      "LOW": 95.82,
+      "MEDIUM": 2.93,
+      "HIGH": 1.13,
+      "SEVERE": 0.11
+    }
+  },
+  "feature_columns": [
+    "flow",
+    "occupancy",
+    "speed",
+    "flow_lag_5m",
+    "flow_lag_15m",
+    "flow_lag_30m",
+    "flow_lag_1h",
+    "speed_lag_5m",
+    "speed_lag_15m",
+    "speed_lag_30m",
+    "speed_lag_1h",
+    "occupancy_lag_5m",
+    "occupancy_lag_15m",
+    "occupancy_lag_30m",
+    "occupancy_lag_1h",
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_rush_hour"
+  ],
+  "regression": {
+    "baseline_linear_regression": {
+      "training_time_sec": 1.32,
+      "validation": {
+        "split": "validation",
+        "n_samples": 454750,
+        "mae": 2.2668,
+        "rmse": 4.4863,
+        "r2": 0.5445
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 454750,
+        "mae": 2.4832,
+        "rmse": 4.8593,
+        "r2": 0.5284
+      },
+      "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_speed_baseline.joblib"
+    },
+    "random_forest_regressor": {
+      "training_time_sec": 222.51,
+      "validation": {
+        "split": "validation",
+        "n_samples": 454750,
+        "mae": 1.8529,
+        "rmse": 4.1424,
+        "r2": 0.6116
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 454750,
+        "mae": 1.9773,
+        "rmse": 4.3529,
+        "r2": 0.6216
+      },
+      "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_speed_random_forest.joblib"
+    },
+    "_persistence_baseline_context_only": {
+      "note": "NOT one of the two required models - a trivial 'predict no change' reference point",
+      "test": {
+        "mae": 2.2337,
+        "rmse": 5.1503,
+        "r2": 0.4702
+      }
+    }
+  },
+  "classification": {
+    "logistic_regression": {
+      "training_time_sec": 52.65,
+      "validation": {
+        "split": "validation",
+        "n_samples": 454750,
+        "accuracy": 0.8472,
+        "precision_macro": 0.3591,
+        "recall_macro": 0.5936,
+        "f1_macro": 0.3832,
+        "f1_weighted": 0.896,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9936,
+            "recall": 0.8639,
+            "f1": 0.9242,
+            "support": 436246
+          },
+          "MEDIUM": {
+            "precision": 0.1146,
+            "recall": 0.4171,
+            "f1": 0.1798,
+            "support": 12426
+          },
+          "HIGH": {
+            "precision": 0.304,
+            "recall": 0.5156,
+            "f1": 0.3825,
+            "support": 5180
+          },
+          "SEVERE": {
+            "precision": 0.0242,
+            "recall": 0.578,
+            "f1": 0.0465,
+            "support": 898
+          }
+        },
+        "confusion_matrix": [
+          [
+            376873,
+            39063,
+            2744,
+            17566
+          ],
+          [
+            1780,
+            5183,
+            3214,
+            2249
+          ],
+          [
+            497,
+            906,
+            2671,
+            1106
+          ],
+          [
+            132,
+            90,
+            157,
+            519
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "SEVERE"
+        ]
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 454750,
+        "accuracy": 0.8235,
+        "precision_macro": 0.3544,
+        "recall_macro": 0.5636,
+        "f1_macro": 0.3731,
+        "f1_weighted": 0.8798,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9937,
+            "recall": 0.8424,
+            "f1": 0.9118,
+            "support": 433435
+          },
+          "MEDIUM": {
+            "precision": 0.1063,
+            "recall": 0.3954,
+            "f1": 0.1675,
+            "support": 13873
+          },
+          "HIGH": {
+            "precision": 0.3009,
+            "recall": 0.518,
+            "f1": 0.3807,
+            "support": 6626
+          },
+          "SEVERE": {
+            "precision": 0.0168,
+            "recall": 0.4988,
+            "f1": 0.0324,
+            "support": 816
+          }
+        },
+        "confusion_matrix": [
+          [
+            365142,
+            44953,
+            3647,
+            19693
+          ],
+          [
+            1647,
+            5485,
+            4117,
+            2624
+          ],
+          [
+            540,
+            1105,
+            3432,
+            1549
+          ],
+          [
+            132,
+            68,
+            209,
+            407
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "SEVERE"
+        ]
+      },
+      "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_congestion_logistic.joblib"
+    },
+    "random_forest_classifier": {
+      "training_time_sec": 60.39,
+      "validation": {
+        "split": "validation",
+        "n_samples": 454750,
+        "accuracy": 0.8757,
+        "precision_macro": 0.3871,
+        "recall_macro": 0.6777,
+        "f1_macro": 0.4365,
+        "f1_weighted": 0.9107,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9946,
+            "recall": 0.8847,
+            "f1": 0.9364,
+            "support": 436246
+          },
+          "MEDIUM": {
+            "precision": 0.1756,
+            "recall": 0.7178,
+            "f1": 0.2821,
+            "support": 12426
+          },
+          "HIGH": {
+            "precision": 0.299,
+            "recall": 0.5558,
+            "f1": 0.3888,
+            "support": 5180
+          },
+          "SEVERE": {
+            "precision": 0.0792,
+            "recall": 0.5523,
+            "f1": 0.1385,
+            "support": 898
+          }
+        },
+        "confusion_matrix": [
+          [
+            385951,
+            40290,
+            5015,
+            4990
+          ],
+          [
+            1547,
+            8919,
+            1612,
+            348
+          ],
+          [
+            422,
+            1448,
+            2879,
+            431
+          ],
+          [
+            138,
+            141,
+            123,
+            496
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "SEVERE"
+        ]
+      },
+      "test": {
+        "split": "test",
+        "n_samples": 454750,
+        "accuracy": 0.8627,
+        "precision_macro": 0.385,
+        "recall_macro": 0.6652,
+        "f1_macro": 0.4285,
+        "f1_weighted": 0.901,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9945,
+            "recall": 0.8736,
+            "f1": 0.9302,
+            "support": 433435
+          },
+          "MEDIUM": {
+            "precision": 0.1747,
+            "recall": 0.6919,
+            "f1": 0.2789,
+            "support": 13873
+          },
+          "HIGH": {
+            "precision": 0.31,
+            "recall": 0.5463,
+            "f1": 0.3956,
+            "support": 6626
+          },
+          "SEVERE": {
+            "precision": 0.0606,
+            "recall": 0.549,
+            "f1": 0.1092,
+            "support": 816
+          }
+        },
+        "confusion_matrix": [
+          [
+            378647,
+            43267,
+            5779,
+            5742
+          ],
+          [
+            1466,
+            9599,
+            2144,
+            664
+          ],
+          [
+            485,
+            1988,
+            3620,
+            533
+          ],
+          [
+            128,
+            107,
+            133,
+            448
+          ]
+        ],
+        "confusion_matrix_labels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "SEVERE"
+        ]
+      },
+      "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_congestion_random_forest.joblib"
+    }
+  },
+  "selected_regressor": "random_forest_regressor",
+  "selected_classifier": "random_forest_classifier",
+  "selection_criterion": "regressor: lowest validation MAE. classifier: highest validation macro-F1. Test set used only for final reporting, never selection."
+}

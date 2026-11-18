@@ -1,0 +1,46 @@
+{
+  "baseline_linear_regression": {
+    "training_time_sec": 1.32,
+    "validation": {
+      "split": "validation",
+      "n_samples": 454750,
+      "mae": 2.2668,
+      "rmse": 4.4863,
+      "r2": 0.5445
+    },
+    "test": {
+      "split": "test",
+      "n_samples": 454750,
+      "mae": 2.4832,
+      "rmse": 4.8593,
+      "r2": 0.5284
+    },
+    "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_speed_baseline.joblib"
+  },
+  "random_forest_regressor": {
+    "training_time_sec": 222.51,
+    "validation": {
+      "split": "validation",
+      "n_samples": 454750,
+      "mae": 1.8529,
+      "rmse": 4.1424,
+      "r2": 0.6116
+    },
+    "test": {
+      "split": "test",
+      "n_samples": 454750,
+      "mae": 1.9773,
+      "rmse": 4.3529,
+      "r2": 0.6216
+    },
+    "model_path": "/home/claude/traffic-flow-predictor/ml/training/../models/pems08/pems08_speed_random_forest.joblib"
+  },
+  "_persistence_baseline_context_only": {
+    "note": "NOT one of the two required models - a trivial 'predict no change' reference point",
+    "test": {
+      "mae": 2.2337,
+      "rmse": 5.1503,
+      "r2": 0.4702
+    }
+  }
+}

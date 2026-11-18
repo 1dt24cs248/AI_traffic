@@ -1,0 +1,25 @@
+=== random_forest_classifier - VALIDATION ===
+              precision    recall  f1-score   support
+
+         LOW       0.99      0.88      0.94    436246
+      MEDIUM       0.18      0.72      0.28     12426
+        HIGH       0.30      0.56      0.39      5180
+      SEVERE       0.08      0.55      0.14       898
+
+    accuracy                           0.88    454750
+   macro avg       0.39      0.68      0.44    454750
+weighted avg       0.96      0.88      0.91    454750
+
+
+=== random_forest_classifier - TEST ===
+              precision    recall  f1-score   support
+
+         LOW       0.99      0.87      0.93    433435
+      MEDIUM       0.17      0.69      0.28     13873
+        HIGH       0.31      0.55      0.40      6626
+      SEVERE       0.06      0.55      0.11       816
+
+    accuracy                           0.86    454750
+   macro avg       0.38      0.67      0.43    454750
+weighted avg       0.96      0.86      0.90    454750
+

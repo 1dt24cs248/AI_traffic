@@ -1,0 +1,25 @@
+=== logistic_regression - VALIDATION ===
+              precision    recall  f1-score   support
+
+         LOW       0.99      0.86      0.92    436246
+      MEDIUM       0.11      0.42      0.18     12426
+        HIGH       0.30      0.52      0.38      5180
+      SEVERE       0.02      0.58      0.05       898
+
+    accuracy                           0.85    454750
+   macro avg       0.36      0.59      0.38    454750
+weighted avg       0.96      0.85      0.90    454750
+
+
+=== logistic_regression - TEST ===
+              precision    recall  f1-score   support
+
+         LOW       0.99      0.84      0.91    433435
+      MEDIUM       0.11      0.40      0.17     13873
+        HIGH       0.30      0.52      0.38      6626
+      SEVERE       0.02      0.50      0.03       816
+
+    accuracy                           0.82    454750
+   macro avg       0.35      0.56      0.37    454750
+weighted avg       0.95      0.82      0.88    454750
+
